@@ -1,0 +1,18 @@
+{
+  "name": "rwa-second-homework",
+  "version": "1.0.0",
+  "description": "Web security vulnerabilities demo: SQL Injection + Broken Authentication, each with a VULNERABLE/SECURE toggle.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "ejs": "^3.1.10",
+    "express": "^4.21.2"
+  }
+}
