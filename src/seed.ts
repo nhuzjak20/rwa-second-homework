@@ -1,13 +1,10 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-// Seed data. Passwords are stored in PLAINTEXT on purpose so the SQL Injection
-// demo can show leaked credentials in the UI. Intentional for the assignment,
-// not a production practice.
-
 export interface SeedUser {
   username: string;
   password: string;
   role: 'admin' | 'user';
+  email: string;
 }
 
 export interface SeedProduct {
@@ -17,8 +14,8 @@ export interface SeedProduct {
 }
 
 export const SEED_USERS: SeedUser[] = [
-  { username: 'admin', password: 'Adm1n!2024', role: 'admin' },
-  { username: 'guest', password: 'guest123', role: 'user' },
+  { username: 'admin', password: 'Adm1n!2024', role: 'admin', email: 'admin@rwa.local' },
+  { username: 'guest', password: 'guest123', role: 'user', email: 'guest@rwa.local' },
 ];
 
 export const SEED_PRODUCTS: SeedProduct[] = [
@@ -28,10 +25,6 @@ export const SEED_PRODUCTS: SeedProduct[] = [
   { name: 'Admin License Key', price: 0, secret: 'FLAG-ADMIN-ONLY-XYZ' },
 ];
 
-/**
- * Create the schema and insert seed rows. Dropping first makes the function
- * idempotent, so it can be safely re-run on each boot.
- */
 export function seedDatabase(db: DatabaseSync): DatabaseSync {
   db.exec(`
     DROP TABLE IF EXISTS users;
@@ -41,7 +34,8 @@ export function seedDatabase(db: DatabaseSync): DatabaseSync {
       id       INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT NOT NULL UNIQUE,
       password TEXT NOT NULL,
-      role     TEXT NOT NULL DEFAULT 'user'
+      role     TEXT NOT NULL DEFAULT 'user',
+      email    TEXT NOT NULL DEFAULT ''
     );
 
     CREATE TABLE products (
@@ -53,10 +47,10 @@ export function seedDatabase(db: DatabaseSync): DatabaseSync {
   `);
 
   const insUser = db.prepare(
-    'INSERT INTO users (username, password, role) VALUES (?, ?, ?)'
+    'INSERT INTO users (username, password, role, email) VALUES (?, ?, ?, ?)'
   );
   for (const u of SEED_USERS) {
-    insUser.run(u.username, u.password, u.role);
+    insUser.run(u.username, u.password, u.role, u.email);
   }
 
   const insProduct = db.prepare(

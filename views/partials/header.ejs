@@ -1,30 +1,22 @@
 <header>
-  <h1>RWA — Security Vulnerabilities Demo</h1>
-  <p>SQL Injection &amp; Broken Authentication, each with a VULNERABLE/SECURE toggle.</p>
+  <h1>RWA — Demo sigurnosnih ranjivosti</h1>
+  <p>SQL umetanje i loša autentifikacija, svaka s prekidačem RANJIVO / SIGURNO.</p>
 
   <div class="toggles">
     <%
       const switches = [
-        { name: 'sqli', label: 'SQL Injection', on: flags.sqliVulnerable },
-        { name: 'auth', label: 'Broken Authentication', on: flags.authVulnerable },
+        { name: 'sqli', label: 'SQL umetanje', on: flags.sqliVulnerable },
+        { name: 'csrf', label: 'CSRF', on: flags.csrfVulnerable },
       ];
     %>
     <% switches.forEach(function (s) { %>
-      <form class="toggle" method="POST" action="/toggle">
+      <form class="toggle" method="POST" action="/">
+        <input type="hidden" name="action" value="toggle">
         <input type="hidden" name="name" value="<%= s.name %>">
+        <input type="checkbox" onchange="this.form.submit()" <%= s.on ? 'checked' : '' %>>
         <span class="toggle-label"><%= s.label %></span>
-        <label class="switch">
-          <input type="checkbox" onchange="this.form.submit()" <%= s.on ? 'checked' : '' %>>
-          <span class="slider"></span>
-        </label>
-        <span class="badge <%= s.on ? 'badge-vuln' : 'badge-secure' %>">
-          <%= s.on ? 'VULNERABLE' : 'SECURE' %>
-        </span>
+        <span class="badge">[<%= s.on ? 'RANJIVO' : 'SIGURNO' %>]</span>
       </form>
     <% }); %>
   </div>
-
-  <nav class="mainnav">
-    <a href="/">Home</a>
-  </nav>
 </header>

@@ -6,12 +6,139 @@
 <body>
   <%- include('partials/header') %>
   <main>
-    <p>Project scaffolding is up and running. Features are added in later steps:</p>
-    <div class="vuln">1. <strong>SQL Injection</strong> (tautology) — <code>/search</code>, <code>/sql-login</code></div>
-    <div class="vuln">2. <strong>Broken Authentication</strong> — <code>/login</code>, <code>/account</code></div>
-    <p style="margin-top:1rem">Database seeded: <strong><%= userCount %></strong> users,
-      <strong><%= productCount %></strong> products.</p>
-    <p>Use the switches above to turn each vulnerability on (VULNERABLE) or off (SECURE).</p>
+    <p>Baza je popunjena: <strong><%= userCount %></strong> korisnika,
+      <strong><%= productCount %></strong> proizvoda.
+      Prekidačima iznad uključujete (RANJIVO) ili isključujete (SIGURNO) svaku ranjivost.</p>
+
+    <!-- ============ Ranjivost 1: SQL umetanje ============ -->
+    <section class="panel">
+      <h2>1) SQL umetanje &nbsp; <span class="badge">[<%= flags.sqliVulnerable ? 'RANJIVO' : 'SIGURNO' %>]</span></h2>
+
+      <h3>a) Pretraga proizvoda</h3>
+      <p class="hint">Upišite uobičajen pojam poput <code>Mouse</code>, zatim tautologiju
+        <code>' OR '1'='1</code> (u načinu RANJIVO ispisuje sve retke, uključujući tajnu samo za admina).</p>
+      <form class="inline" method="POST" action="/">
+        <input type="hidden" name="action" value="search">
+        <label class="field">Pojam za pretragu
+          <input type="text" name="q" value="<%= q %>" placeholder="npr. Mouse">
+        </label>
+        <button type="submit">Pretraži</button>
+      </form>
+
+      <% if (searchResult) { %>
+        <h3>Izvršeni SQL</h3>
+        <pre class="sql"><%= searchResult.sql %></pre>
+        <% if (searchResult.error) { %>
+          <p class="err">SQL greška: <%= searchResult.error %></p>
+        <% } else { %>
+          <h3>Broj vraćenih redaka: <%= searchResult.rows.length %></h3>
+          <table>
+            <thead><tr><th>id</th><th>naziv</th><th>cijena</th><th>tajna</th></tr></thead>
+            <tbody>
+              <% searchResult.rows.forEach(function (r) { %>
+                <tr class="<%= r.secret ? 'leak' : '' %>">
+                  <td><%= r.id %></td><td><%= r.name %></td><td><%= r.price %></td>
+                  <td><%= r.secret === null ? '' : r.secret %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        <% } %>
+      <% } %>
+
+      <h3>b) SQL prijava (zaobilaženje tautologijom)</h3>
+      <p class="hint">U načinu RANJIVO korisničko ime <code>' OR '1'='1' --</code> (bilo koja lozinka)
+        prijavljuje kao <strong>admin</strong> bez poznavanja lozinke.</p>
+      <form class="inline" method="POST" action="/">
+        <input type="hidden" name="action" value="sql-login">
+        <label class="field">Korisničko ime
+          <input type="text" name="username" value="<%= loginUsername %>" placeholder="admin">
+        </label>
+        <label class="field">Lozinka
+          <input type="password" name="password" placeholder="lozinka">
+        </label>
+        <button type="submit">Prijava</button>
+      </form>
+
+      <% if (loginResult) { %>
+        <h3>Izvršeni SQL</h3>
+        <pre class="sql"><%= loginResult.sql %></pre>
+        <% if (loginResult.error) { %>
+          <p class="err">SQL greška: <%= loginResult.error %></p>
+        <% } else if (loginResult.success && loginResult.user) { %>
+          <p class="ok">Prijava uspješna — prijavljeni kao
+            <strong><%= loginResult.user.username %></strong>
+            (uloga: <%= loginResult.user.role %>).</p>
+        <% } else { %>
+          <p class="fail">Prijava neuspješna — nema odgovarajućeg korisnika.</p>
+        <% } %>
+      <% } %>
+    </section>
+
+    <!-- ============ Ranjivost 2: CSRF ============ -->
+    <section class="panel">
+      <h2>2) CSRF — Lažiranje zahtjeva na drugom sjedištu &nbsp;
+        <span class="badge">[<%= flags.csrfVulnerable ? 'RANJIVO' : 'SIGURNO' %>]</span></h2>
+
+      <h3>Trenutna sjednica (žrtva)</h3>
+      <% if (session) { %>
+        <p>Prijavljeni kao <strong><%= session.username %></strong>.
+          Trenutni e-mail profila: <strong><%= session.email %></strong>.</p>
+        <form class="inline" method="POST" action="/">
+          <input type="hidden" name="action" value="csrf-logout">
+          <button type="submit">Odjava</button>
+        </form>
+      <% } else { %>
+        <p>Žrtva nije prijavljena. Prijavite se da biste imali sjednicu koju napad može iskoristiti.</p>
+        <% if (csrfError) { %><p class="fail"><%= csrfError %></p><% } %>
+        <form class="inline" method="POST" action="/">
+          <input type="hidden" name="action" value="csrf-login">
+          <label class="field">Korisničko ime
+            <input type="text" name="username" value="guest">
+          </label>
+          <label class="field">Lozinka
+            <input type="password" name="password" value="guest123">
+          </label>
+          <button type="submit">Prijava (žrtva)</button>
+        </form>
+      <% } %>
+
+      <% if (session) { %>
+        <h3>a) Legitimna promjena e-maila</h3>
+        <p class="hint">Prava stranica aplikacije šalje i skriveni CSRF token. U načinu SIGURNO
+          poslužitelj ga provjerava; u načinu RANJIVO ne provjerava ništa osim kolačića sjednice.</p>
+        <% if (csrfError) { %><p class="fail"><%= csrfError %></p><% } %>
+        <form class="inline" method="POST" action="/">
+          <input type="hidden" name="action" value="change-email">
+          <input type="hidden" name="csrf" value="<%= csrfToken %>">
+          <label class="field">Novi e-mail
+            <input type="text" name="email" placeholder="novi@email.hr">
+          </label>
+          <button type="submit">Promijeni e-mail</button>
+        </form>
+
+        <h3>b) Napad s drugog sjedišta (CSRF)</h3>
+        <p class="hint">Ovaj gumb oponaša zahtjev sa <strong>zlonamjerne stranice</strong>: koristi
+          kolačić sjednice žrtve, ali <strong>nema valjani CSRF token</strong> (napadač ga ne može
+          pročitati). U načinu RANJIVO zahtjev prolazi i mijenja e-mail žrtve u
+          <code>napadac@zlo.example</code>; u načinu SIGURNO poslužitelj ga odbija.</p>
+        <form class="inline" method="POST" action="/">
+          <input type="hidden" name="action" value="csrf-attack">
+          <button type="submit">Pokreni CSRF napad</button>
+        </form>
+        <% if (csrfResult) { %>
+          <p class="<%= /uspio/i.test(csrfResult) ? 'fail' : 'ok' %>"><%= csrfResult %></p>
+        <% } %>
+      <% } %>
+
+      <h3>Zapis akcija</h3>
+      <% if (actionLog && actionLog.length) { %>
+        <pre class="sql"><% actionLog.slice().reverse().forEach(function (a) { %><%= a %>
+<% }); %></pre>
+      <% } else { %>
+        <p class="hint">(još nema akcija)</p>
+      <% } %>
+    </section>
   </main>
 </body>
 </html>
