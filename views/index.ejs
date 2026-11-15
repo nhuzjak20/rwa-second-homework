@@ -1,26 +1,17 @@
 <!DOCTYPE html>
 <html lang="hr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= title %></title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
-    header { border-bottom: 1px solid #ccc; padding-bottom: 1rem; margin-bottom: 1.5rem; }
-    h1 { margin: 0 0 .25rem; }
-    .vuln { margin: .5rem 0; }
-    code { background: #f2f2f2; padding: .1rem .3rem; border-radius: 3px; }
-  </style>
+  <%- include('partials/head') %>
 </head>
 <body>
-  <header>
-    <h1>RWA — Security Vulnerabilities Demo</h1>
-    <p>SQL Injection &amp; Broken Authentication, each with a VULNERABLE/SECURE toggle.</p>
-  </header>
+  <%- include('partials/header') %>
   <main>
     <p>Project scaffolding is up and running. Features are added in later steps:</p>
     <div class="vuln">1. <strong>SQL Injection</strong> (tautology) — <code>/search</code>, <code>/sql-login</code></div>
     <div class="vuln">2. <strong>Broken Authentication</strong> — <code>/login</code>, <code>/account</code></div>
+    <p style="margin-top:1rem">Database seeded: <strong><%= userCount %></strong> users,
+      <strong><%= productCount %></strong> products.</p>
+    <p>Use the switches above to turn each vulnerability on (VULNERABLE) or off (SECURE).</p>
   </main>
 </body>
 </html>
