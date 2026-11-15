@@ -2,9 +2,12 @@
   "name": "rwa-second-homework",
   "version": "1.0.0",
   "description": "Web security vulnerabilities demo: SQL Injection + Broken Authentication, each with a VULNERABLE/SECURE toggle.",
-  "main": "src/server.js",
+  "main": "dist/server.js",
   "scripts": {
-    "start": "node src/server.js"
+    "build": "tsc",
+    "prestart": "npm run build",
+    "start": "node dist/server.js",
+    "dev": "tsc --watch"
   },
   "engines": {
     "node": ">=24.0.0"
@@ -13,5 +16,10 @@
   "dependencies": {
     "ejs": "^3.1.10",
     "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
   }
 }
