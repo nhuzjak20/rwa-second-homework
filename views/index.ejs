@@ -75,60 +75,55 @@
       <% } %>
     </section>
 
-    <!-- ============ Ranjivost 2: CSRF ============ -->
+    <!-- ============ Ranjivost 2: Loša autentifikacija ============ -->
     <section class="panel">
-      <h2>2) CSRF — Lažiranje zahtjeva na drugom sjedištu &nbsp;
-        <span class="badge">[<%= flags.csrfVulnerable ? 'RANJIVO' : 'SIGURNO' %>]</span></h2>
+      <h2>2) Loša autentifikacija &nbsp;
+        <span class="badge">[<%= flags.authVulnerable ? 'RANJIVO' : 'SIGURNO' %>]</span></h2>
 
-      <h3>Trenutna sjednica (žrtva)</h3>
+      <h3>Trenutna sjednica</h3>
       <% if (session) { %>
-        <p>Prijavljeni kao <strong><%= session.username %></strong>.
-          Trenutni e-mail profila: <strong><%= session.email %></strong>.</p>
+        <p>Prijavljeni kao <strong><%= session.username %></strong> (uloga: <strong><%= session.role %></strong>).</p>
+        <p class="hint">Kolačić sjednice: <code><%= sessionCookie %></code></p>
         <form class="inline" method="POST" action="/">
-          <input type="hidden" name="action" value="csrf-logout">
+          <input type="hidden" name="action" value="auth-logout">
           <button type="submit">Odjava</button>
         </form>
       <% } else { %>
-        <p>Žrtva nije prijavljena. Prijavite se da biste imali sjednicu koju napad može iskoristiti.</p>
-        <% if (csrfError) { %><p class="fail"><%= csrfError %></p><% } %>
+        <p>Niste prijavljeni.</p>
+        <% if (authError) { %><p class="fail"><%= authError %></p><% } %>
         <form class="inline" method="POST" action="/">
-          <input type="hidden" name="action" value="csrf-login">
+          <input type="hidden" name="action" value="auth-login">
           <label class="field">Korisničko ime
             <input type="text" name="username" value="guest">
           </label>
           <label class="field">Lozinka
             <input type="password" name="password" value="guest123">
           </label>
-          <button type="submit">Prijava (žrtva)</button>
+          <button type="submit">Prijava</button>
         </form>
       <% } %>
 
-      <% if (session) { %>
-        <h3>a) Legitimna promjena e-maila</h3>
-        <p class="hint">Prava stranica aplikacije šalje i skriveni CSRF token. U načinu SIGURNO
-          poslužitelj ga provjerava; u načinu RANJIVO ne provjerava ništa osim kolačića sjednice.</p>
-        <% if (csrfError) { %><p class="fail"><%= csrfError %></p><% } %>
-        <form class="inline" method="POST" action="/">
-          <input type="hidden" name="action" value="change-email">
-          <input type="hidden" name="csrf" value="<%= csrfToken %>">
-          <label class="field">Novi e-mail
-            <input type="text" name="email" placeholder="novi@email.hr">
-          </label>
-          <button type="submit">Promijeni e-mail</button>
-        </form>
+      <h3>a) Krivotvorenje sjednice (preuzimanje identiteta)</h3>
+      <p class="hint">U načinu RANJIVO kolačić sjednice je samo <code>base64(korisničko_ime)</code> i
+        poslužitelj mu vjeruje bez provjere. Gumb postavlja kolačić na
+        <code><%= forgedAdmin %></code> (base64 za <code>admin</code>) → postajete
+        <strong>admin</strong> bez lozinke. U načinu SIGURNO token je nasumičan i čuva se na
+        poslužitelju, pa krivotvoreni kolačić ne vrijedi.</p>
+      <form class="inline" method="POST" action="/">
+        <input type="hidden" name="action" value="auth-forge">
+        <button type="submit">Krivotvori admin sjednicu</button>
+      </form>
 
-        <h3>b) Napad s drugog sjedišta (CSRF)</h3>
-        <p class="hint">Ovaj gumb oponaša zahtjev sa <strong>zlonamjerne stranice</strong>: koristi
-          kolačić sjednice žrtve, ali <strong>nema valjani CSRF token</strong> (napadač ga ne može
-          pročitati). U načinu RANJIVO zahtjev prolazi i mijenja e-mail žrtve u
-          <code>napadac@zlo.example</code>; u načinu SIGURNO poslužitelj ga odbija.</p>
-        <form class="inline" method="POST" action="/">
-          <input type="hidden" name="action" value="csrf-attack">
-          <button type="submit">Pokreni CSRF napad</button>
-        </form>
-        <% if (csrfResult) { %>
-          <p class="<%= /uspio/i.test(csrfResult) ? 'fail' : 'ok' %>"><%= csrfResult %></p>
-        <% } %>
+      <h3>b) Brute-force (nepostojanje ograničenja pokušaja)</h3>
+      <p class="hint">Gumb pokušava niz uobičajenih lozinki za račun <code>admin</code>. U načinu
+        RANJIVO nema ograničenja pa napad može isprobati sve pokušaje i pogoditi lozinku; u načinu
+        SIGURNO račun se zaključava nakon <%= 3 %> neuspjela pokušaja i daljnje pogađanje je blokirano.</p>
+      <form class="inline" method="POST" action="/">
+        <input type="hidden" name="action" value="auth-brute">
+        <button type="submit">Pokreni brute-force napad</button>
+      </form>
+      <% if (authResult) { %>
+        <p class="<%= /uspio/i.test(authResult) ? 'fail' : 'ok' %>"><%= authResult %></p>
       <% } %>
 
       <h3>Zapis akcija</h3>

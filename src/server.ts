@@ -7,15 +7,14 @@ import {
   COOKIE_NAME,
   parseCookies,
   resolveSession,
-  login as csrfLogin,
+  login as authLogin,
   destroySession,
-  getCsrfToken,
-  validateCsrf,
-  changeEmail,
+  forgeToken,
+  bruteForce,
   logAction,
   actionLog,
   type SessionUser,
-} from './csrf';
+} from './auth';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -43,15 +42,15 @@ function renderIndex(
     searchResult?: SearchResult | null;
     loginUsername?: string;
     loginResult?: LoginResult | null;
-    csrfError?: string | null;
-    csrfResult?: string | null;
+    authError?: string | null;
+    authResult?: string | null;
   } = {}
 ): void {
   const userCount = (db.prepare('SELECT COUNT(*) AS n FROM users').get() as { n: number }).n;
   const productCount = (db.prepare('SELECT COUNT(*) AS n FROM products').get() as { n: number }).n;
   const token = sessionToken(req);
-  const session: SessionUser | null = resolveSession(db, token);
-  const csrfToken = session && token ? getCsrfToken(token) : '';
+  const session: SessionUser | null = resolveSession(db, token, flags.authVulnerable);
+  const forgedAdmin = forgeToken('admin');
   res.render('index', {
     title: 'RWA — Demo sigurnosnih ranjivosti',
     userCount,
@@ -61,9 +60,10 @@ function renderIndex(
     loginUsername: extra.loginUsername ?? '',
     loginResult: extra.loginResult ?? null,
     session,
-    csrfToken,
-    csrfError: extra.csrfError ?? null,
-    csrfResult: extra.csrfResult ?? null,
+    forgedAdmin,
+    sessionCookie: token ?? '',
+    authError: extra.authError ?? null,
+    authResult: extra.authResult ?? null,
     actionLog,
   });
 }
@@ -99,59 +99,63 @@ app.post('/', (req: Request, res: Response) => {
       });
     }
     
-    case 'csrf-login': {
+    case 'auth-login': {
       const username = str(req.body.username);
       const password = str(req.body.password);
-      const token = csrfLogin(db, username, password);
-      if (token) {
-        res.cookie(COOKIE_NAME, token, {
+      const outcome = authLogin(db, username, password, flags.authVulnerable);
+      if (outcome.ok && outcome.token) {
+        res.cookie(COOKIE_NAME, outcome.token, {
           httpOnly: true,
-          sameSite: flags.csrfVulnerable ? 'lax' : 'strict',
+          sameSite: flags.authVulnerable ? 'lax' : 'strict',
         });
-        logAction(`Prijava žrtve: "${username}".`);
+        logAction(`Prijava: "${username}".`);
         return res.redirect('/');
       }
-      return renderIndex(req, res, { csrfError: 'Prijava neuspješna — pogrešni podaci.' });
+      if (outcome.locked) {
+        logAction(`Prijava ODBIJENA — račun "${username}" je zaključan.`);
+        return renderIndex(req, res, {
+          authError: `Račun "${username}" je zaključan nakon previše neuspjelih pokušaja.`,
+        });
+      }
+      return renderIndex(req, res, { authError: 'Prijava neuspješna — pogrešni podaci.' });
     }
-    case 'csrf-logout': {
+    case 'auth-logout': {
       destroySession(sessionToken(req));
       res.clearCookie(COOKIE_NAME);
       logAction('Odjava.');
       return res.redirect('/');
     }
-    case 'change-email': {
-      const token = sessionToken(req);
-      const session = resolveSession(db, token);
-      if (!session || !token) {
-        return renderIndex(req, res, { csrfError: 'Niste prijavljeni.' });
+    case 'auth-forge': {
+      const forged = forgeToken('admin');
+      if (flags.authVulnerable) {
+        res.cookie(COOKIE_NAME, forged, { httpOnly: true, sameSite: 'lax' });
+        logAction(`Krivotvorena sjednica: kolačić postavljen na "${forged}" (base64 za "admin").`);
+        return res.redirect('/');
       }
-      
-      if (!flags.csrfVulnerable && !validateCsrf(token, str(req.body.csrf))) {
-        logAction('Promjena e-maila ODBIJENA (nevažeći CSRF token).');
-        return renderIndex(req, res, { csrfError: 'CSRF token nevažeći — zahtjev odbijen.' });
-      }
-      const email = str(req.body.email);
-      changeEmail(db, session.username, email);
-      logAction(`E-mail korisnika "${session.username}" promijenjen u "${email}".`);
-      return res.redirect('/');
+      res.cookie(COOKIE_NAME, forged, { httpOnly: true, sameSite: 'strict' });
+      logAction('Krivotvorena sjednica ODBIJENA — token nije u poslužiteljskom spremištu.');
+      return renderIndex(req, res, {
+        authResult: 'Napad odbijen — poslužitelj prihvaća samo nasumični token iz svog spremišta, a ne krivotvoreni kolačić.',
+      });
     }
-    case 'csrf-attack': {
-      const token = sessionToken(req);
-      const session = resolveSession(db, token);
-      if (!session || !token) {
-        return renderIndex(req, res, { csrfResult: 'Nema prijavljene žrtve — prvo se prijavite.' });
-      }
-      const evil = 'napadac@zlo.example';
-      if (!flags.csrfVulnerable && !validateCsrf(token, str(req.body.csrf))) {
-        logAction('CSRF napad ODBIJEN (nedostaje valjani token).');
+    case 'auth-brute': {
+      const target = 'admin';
+      const outcome = bruteForce(db, target, flags.authVulnerable);
+      if (outcome.cracked) {
+        logAction(`Brute-force USPIO — lozinka za "${target}" pogođena nakon ${outcome.processed} pokušaja.`);
         return renderIndex(req, res, {
-          csrfResult: 'Napad odbijen — poslužitelj traži valjani CSRF token kojeg napadač nema.',
+          authResult: `Napad uspio — nema ograničenja pokušaja, lozinka za "${target}" pogođena ("${outcome.crackedPassword}") nakon ${outcome.processed} pokušaja.`,
         });
       }
-      changeEmail(db, session.username, evil);
-      logAction(`CSRF napad USPIO — e-mail "${session.username}" promijenjen u "${evil}".`);
+      if (outcome.locked) {
+        logAction(`Brute-force ZAUSTAVLJEN — račun "${target}" zaključan nakon ${outcome.processed} pokušaja.`);
+        return renderIndex(req, res, {
+          authResult: `Napad zaustavljen — račun "${target}" zaključan nakon ${outcome.processed} pokušaja; daljnje pogađanje je blokirano.`,
+        });
+      }
+      logAction(`Brute-force: ${outcome.processed} pokušaja, lozinka nije pogođena.`);
       return renderIndex(req, res, {
-        csrfResult: `Napad uspio — e-mail žrtve "${session.username}" promijenjen u "${evil}" bez njezina pristanka.`,
+        authResult: `Obrađeno ${outcome.processed} pokušaja, lozinka nije pogođena.`,
       });
     }
 

@@ -1,16 +1,16 @@
 export interface Flags {
   sqliVulnerable: boolean;
-  csrfVulnerable: boolean;
+  authVulnerable: boolean;
 }
 
 export const flags: Flags = {
   sqliVulnerable: false,
-  csrfVulnerable: false,
+  authVulnerable: false,
 };
 
 export const TOGGLES = {
   sqli: 'sqliVulnerable',
-  csrf: 'csrfVulnerable',
+  auth: 'authVulnerable',
 } as const satisfies Record<string, keyof Flags>;
 
 export type ToggleName = keyof typeof TOGGLES;

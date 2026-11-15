@@ -6,7 +6,7 @@
     <%
       const switches = [
         { name: 'sqli', label: 'SQL umetanje', on: flags.sqliVulnerable },
-        { name: 'csrf', label: 'CSRF', on: flags.csrfVulnerable },
+        { name: 'auth', label: 'Loša autentifikacija', on: flags.authVulnerable },
       ];
     %>
     <% switches.forEach(function (s) { %>
